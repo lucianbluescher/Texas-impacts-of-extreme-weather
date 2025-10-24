@@ -1,0 +1,8 @@
+---
+title: "Texas Blackout Analysis"
+format: pdf
+author: "Lucian Scher"
+date: "11/8/2025"
+---
+
+GitHub repository: https://github.com/lucianbluescher/Texas-impacts-of-extreme-weather.git
