@@ -4,5 +4,61 @@ format: pdf
 author: "Lucian Scher"
 date: "11/8/2025"
 ---
-
 GitHub repository: https://github.com/lucianbluescher/Texas-impacts-of-extreme-weather.git
+
+# 1. Load required packages
+```{r}
+library(stars) # For working with raster data
+library(sf) # For loading data with SQL query subset
+```
+
+
+# 2. Read in Data
+
+## Night Lights: 
+NASA VIIRS Houston night time light coverage data from sinusoidal equal-area projection tiles h08v05 and h08v06 on 2021-02-07 and 2021-02-16
+Key: lights_TILE_DAY
+```{r}
+# tile h08v05, collected on 2021-02-07
+lights_05_07 <- read_stars('data/VNP46A1/VNP46A1.A2021038.h08v05.001.2021039064328.tif')
+
+# tile h08v06, collected on 2021-02-07
+lights_06_07 <- read_stars('data/VNP46A1/VNP46A1.A2021038.h08v06.001.2021039064329.tif')
+
+# tile h08v05, collected on 2021-02-16
+lights_05_16 <- read_stars('data/VNP46A1/VNP46A1.A2021047.h08v05.001.2021048091106.tif')
+
+# tile h08v06, collected on 2021-02-16
+lights_06_16 <- read_stars('data/VNP46A1/VNP46A1.A2021047.h08v06.001.2021048091105.tif')
+```
+
+## Roads:
+Road data from Open Street Map redistributed by Geofabriks and prepared for Houston Specific analysis by teaching team
+```{r}
+# Read road data using SQL query specifying highways only
+roads_sf <- st_read( "data/gis_osm_roads_free_1.gpkg", 
+  query = "SELECT * 
+  FROM gis_osm_roads_free_1 
+  WHERE fclass='motorway'"
+)
+```
+
+## Houses
+House data also from Open Street Map redistributed by Geofabriks and prepared for Houston Specific analysis by teaching team
+
+```{r}
+# Read Houston home data using SQL query specifying only buildings with residents
+homes_sf <- st_read("data/gis_osm_buildings_a_free_1.gpkg",
+  query = "SELECT *
+  FROM gis_osm_buildings_a_free_1
+  WHERE (type IS NULL AND name IS NULL)
+  OR type in ('residential', 'apartments', 'house', 'static_caravan', 'detached')"
+)
+```
+
+## Socioeconomic
+Socioeconomic data from  U.S. Census Bureau’s American Community Surveys 2019 census tracts
+```{r}
+st_layers('ACS_2019_5YR_TRACT_48_TEXAS.gdb')
+```
+
