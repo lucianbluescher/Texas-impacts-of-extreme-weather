@@ -5,7 +5,7 @@ EDS223-HW3
 EDS223-HW3
 └───README.md
 └───Rmd/Proj files    
-└─── texas_blackout.qmd # Name your qmd file a title that is representative of your analysis!
+└─── texas_blackout.qmd
 └───.gitignore
     └───data
         └───gis_osm_buildings_a_free_1.gpkg

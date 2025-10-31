@@ -3,6 +3,8 @@ title: "Texas Blackout Analysis"
 format: pdf
 author: "Lucian Scher"
 date: "11/8/2025"
+editor_options: 
+  chunk_output_type: inline
 ---
 GitHub repository: https://github.com/lucianbluescher/Texas-impacts-of-extreme-weather.git
 
@@ -19,16 +21,16 @@ library(sf) # For loading data with SQL query subset
 NASA VIIRS Houston night time light coverage data from sinusoidal equal-area projection tiles h08v05 and h08v06 on 2021-02-07 and 2021-02-16
 Key: lights_TILE_DAY
 ```{r}
-# tile h08v05, collected on 2021-02-07
+# tile h08v05, collected on 2021-02-07 (VNP1038)
 lights_05_07 <- read_stars('data/VNP46A1/VNP46A1.A2021038.h08v05.001.2021039064328.tif')
 
-# tile h08v06, collected on 2021-02-07
+# tile h08v06, collected on 2021-02-07 (VNP1038)
 lights_06_07 <- read_stars('data/VNP46A1/VNP46A1.A2021038.h08v06.001.2021039064329.tif')
 
-# tile h08v05, collected on 2021-02-16
+# tile h08v05, collected on 2021-02-16 (VNP1038)
 lights_05_16 <- read_stars('data/VNP46A1/VNP46A1.A2021047.h08v05.001.2021048091106.tif')
 
-# tile h08v06, collected on 2021-02-16
+# tile h08v06, collected on 2021-02-16 (VNP1038)
 lights_06_16 <- read_stars('data/VNP46A1/VNP46A1.A2021047.h08v06.001.2021048091105.tif')
 ```
 
@@ -47,6 +49,7 @@ roads_sf <- st_read( "data/gis_osm_roads_free_1.gpkg",
 House data also from Open Street Map redistributed by Geofabriks and prepared for Houston Specific analysis by teaching team
 
 ```{r}
+
 # Read Houston home data using SQL query specifying only buildings with residents
 homes_sf <- st_read("data/gis_osm_buildings_a_free_1.gpkg",
   query = "SELECT *
@@ -59,6 +62,18 @@ homes_sf <- st_read("data/gis_osm_buildings_a_free_1.gpkg",
 ## Socioeconomic
 Socioeconomic data from  U.S. Census Bureau’s American Community Surveys 2019 census tracts
 ```{r}
-st_layers('ACS_2019_5YR_TRACT_48_TEXAS.gdb')
+#Read in income layer
+socio_sf_inc <- st_read('data/ACS_2019_5YR_TRACT_48_TEXAS.gdb',
+                    layer = 'X19_INCOME')
+
+# Read in geometry layer
+socio_sf_geo <- st_read('data/ACS_2019_5YR_TRACT_48_TEXAS.gdb',
+                    layer = 'ACS_2019_5YR_TRACT_48_TEXAS')
+
+# Read in Another layer of socioeconomic information
+```
+
+```{r}
+st_layers(dsn = 'data/ACS_2019_5YR_TRACT_48_TEXAS.gdb')
 ```
 
