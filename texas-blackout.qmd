@@ -15,7 +15,7 @@ library(sf) # For loading data with SQL query subset
 ```
 
 
-# 2. Read in Data
+# 2. Read in all neccessary data
 
 ## Night Lights: 
 NASA VIIRS Houston night time light coverage data from sinusoidal equal-area projection tiles h08v05 and h08v06 on 2021-02-07 and 2021-02-16
@@ -33,38 +33,6 @@ lights_05_16 <- read_stars('data/VNP46A1/VNP46A1.A2021047.h08v05.001.20210480911
 # tile h08v06, collected on 2021-02-16 (VNP1038)
 lights_06_16 <- read_stars('data/VNP46A1/VNP46A1.A2021047.h08v06.001.2021048091105.tif')
 ```
-
-```{r}
-# Combine night light data by day using st_mosaic
-
-feb_7_comb <- st_mosaic(lights_05_07, lights_06_07)
-feb_16_comb <- st_mosaic(lights_05_16, lights_06_16)
-
-# Subtract into a new object to show differences
-comb_change <- feb_16_comb - feb_7_comb
-
-# Reclassify data when change is less than a -200 drop (greater than 200 drop) set to 1, if less than 200 drop set as NA
-blackout_vals <- ifelse(comb_change[[1]] < -200, 1, NA)
-
-# Wrap back into stars data
-blackout_sf <- st_as_stars(blackout_vals, dimensions = st_dimensions(comb_change))
-
-# Convert raster to polygons (sf)
-blackout_sf <- st_as_sf(blackout_sf, as_points = FALSE, merge = TRUE, na.rm = TRUE)
-
-# Fix invalid geometries 
-blackout_sf <- st_make_valid(blackout_sf)
-
-# Plot result
-plot(blackout_sf["X"], main = "Vectorized Blackout Areas")
-
-```
-
-
-```{r}
-st_crop(your_sf_object, xmin = your_xmin, xmax = your_xmax, ymin = your_ymin, ymax = your_ymax)
-```
-
 
 ## Roads:
 Road data from Open Street Map redistributed by Geofabriks and prepared for Houston Specific analysis by teaching team
@@ -109,3 +77,102 @@ socio_sf_geo <- st_read('data/ACS_2019_5YR_TRACT_48_TEXAS.gdb',
 st_layers(dsn = 'data/ACS_2019_5YR_TRACT_48_TEXAS.gdb')
 ```
 
+
+# 3. Creating Blackout Mask
+```{r}
+# Combine night light data by day using st_mosaic
+
+feb_7_comb <- st_mosaic(lights_05_07, lights_06_07)
+feb_16_comb <- st_mosaic(lights_05_16, lights_06_16)
+
+# Subtract into a new object to show differences
+comb_change <- feb_16_comb - feb_7_comb
+
+# Reclassify data when change is less than a -200 drop (greater than 200 drop) set to 1, if less than 200 drop set as NA
+blackout_vals <- ifelse(comb_change[[1]] < -200, 1, NA)
+
+# Wrap back into stars data
+blackout_sf <- st_as_stars(blackout_vals, dimensions = st_dimensions(comb_change))
+
+# Convert raster to polygons (sf)
+blackout_sf <- st_as_sf(blackout_sf, as_points = FALSE, merge = TRUE, na.rm = TRUE)
+
+# Fix invalid geometries 
+blackout_sf <- st_make_valid(blackout_sf)
+
+# Set bounding box of Houston Area from given coordinates 
+houston_bbox <- st_bbox(c(xmin = -96.5, xmax = -94.5, ymin = 29, ymax = 30.5))
+
+# Crop SF by set bbox
+blackout_sf <- st_crop(blackout_sf, houston_bbox)
+
+# Transform CRS of sf to EPSG:3083 (NAD83 / Texas Centric Albers Equal Area)
+blackout_sf <- st_transform(x = blackout_sf, crs = 3083)
+
+# Plot result
+plot(blackout_sf["X"], main = "Vectorized Blackout Areas")
+
+```
+
+# 4. Excluding Highways from blackout mask
+
+```{r}
+# Set CRS 
+if (st_crs(roads_sf)$epsg != 3083) {
+  warning("CRS is not EPSG:3083 — transforming to EPSG:3083.")
+  roads_sf <- st_transform(roads_sf, crs = 3083)
+} else {
+  message("CRS is already EPSG:3083.")
+}
+
+# Crop roads by set bbox
+#roads_sf <- st_crop(roads_sf, houston_bbox)
+
+# Make valid for speed
+#roads_sf <- st_make_valid(roads_sf)
+
+# Use union to combine geometries into one polygon 
+roads_union <- st_union(roads_sf)
+
+# Create buffer of 200m around roads
+road_buffer <- st_buffer(roads_union, dist = 200)
+
+# Use union again for simplification
+road_buffer <- st_union(roads_union)
+
+# Remove points from blackout_sf that are within the 200m buffer around roads
+blackout_dif <- st_difference(x = blackout_sf, y = road_buffer)
+
+# Use st_intersection to remove overlap buffer onto house data
+#roads_sf_buffer_intersect <- st_intersection(blackout_sf, road_buffer)
+
+# Use st_union to combine the roads sf and the buffer
+#roads_sf_buffer_union <- st_union(blackout_sf, road_buffer)
+
+plot(blackout_dif)
+```
+
+# 5. Identify the number of homes likely impacted by blackouts
+
+```{r}
+# Set CRS of homes
+if (st_crs(homes_sf)$epsg != 3083) {
+  warning("CRS is not EPSG:3083 — transforming to EPSG:3083.")
+  homes_sf <- st_transform(homes_sf, crs = 3083)
+} else {
+  message("CRS is already EPSG:3083.")
+}
+
+# Combine blackouts and homes into a single polygon
+blackout_union <- st_union(blackout_dif)
+
+# Check which homes intersect the combined blackout area
+blackout_homes <- st_intersects(homes_sf, st_sf(geometry = blackout_union), sparse = FALSE)[,1]
+
+# Subset homes
+blackout_homes <- homes_sf[blackout_homes, ]
+
+nrow(blackout_homes)  # number of homes in blackout areas
+
+
+```
