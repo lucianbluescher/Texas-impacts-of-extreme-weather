@@ -138,7 +138,7 @@ roads_union <- st_union(roads_sf)
 road_buffer <- st_buffer(roads_union, dist = 200)
 
 # Use union again for simplification
-road_buffer <- st_union(roads_union)
+road_buffer <- st_union(road_buffer)
 
 # Remove points from blackout_sf that are within the 200m buffer around roads
 blackout_dif <- st_difference(x = blackout_sf, y = road_buffer)
@@ -163,14 +163,8 @@ if (st_crs(homes_sf)$epsg != 3083) {
   message("CRS is already EPSG:3083.")
 }
 
-# Combine blackouts and homes into a single polygon
-blackout_union <- st_union(blackout_dif)
-
-# Check which homes intersect the combined blackout area
-blackout_homes <- st_intersects(homes_sf, st_sf(geometry = blackout_union), sparse = FALSE)[,1]
-
-# Subset homes
-blackout_homes <- homes_sf[blackout_homes, ]
+# Check which homes intersect the combined blackout area and subset intersected homes based on boolean
+blackout_homes <- homes_sf[lengths(st_intersects(homes_sf, blackout_dif)) > 0, ]
 
 nrow(blackout_homes)  # number of homes in blackout areas
 
