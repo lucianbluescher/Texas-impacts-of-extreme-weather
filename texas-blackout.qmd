@@ -2,16 +2,19 @@
 title: "Texas Blackout Analysis"
 format: pdf
 author: "Lucian Scher"
-date: "11/8/2025"
+date: "11/11/2025"
 editor_options: 
   chunk_output_type: inline
 ---
 
 GitHub repository: https://github.com/lucianbluescher/Texas-impacts-of-extreme-weather.git
 
+![](images/clipboard-747670850.png)
+
 # 1. Load required packages
 
 ```{r}
+#| message: false
 library(stars)  # For working with raster data
 library(sf)  # For loading data with SQL query subset
 library(tmap)  # For maps
@@ -48,7 +51,7 @@ Road data from Open Street Map redistributed by Geofabriks and prepared for Hous
 roads_sf <- st_read( "data/gis_osm_roads_free_1.gpkg", 
   query = "SELECT * 
   FROM gis_osm_roads_free_1 
-  WHERE fclass='motorway'"
+  WHERE fclass='motorway'", quiet = TRUE
 )
 ```
 
@@ -63,7 +66,7 @@ homes_sf <- st_read("data/gis_osm_buildings_a_free_1.gpkg",
   query = "SELECT *
   FROM gis_osm_buildings_a_free_1
   WHERE (type IS NULL AND name IS NULL)
-  OR type in ('residential', 'apartments', 'house', 'static_caravan', 'detached')"
+  OR type in ('residential', 'apartments', 'house', 'static_caravan', 'detached')", quiet = TRUE
 )
 ```
 
@@ -74,20 +77,19 @@ Socioeconomic data from U.S. Census Bureau’s American Community Surveys 2019 c
 ```{r}
 #Read in income layer
 socio_sf_inc <- st_read('data/ACS_2019_5YR_TRACT_48_TEXAS.gdb',
-                    layer = 'X19_INCOME')
+                    layer = 'X19_INCOME', quiet = TRUE)
 
 # Read in race layer
 socio_sf_race <- st_read('data/ACS_2019_5YR_TRACT_48_TEXAS.gdb',
-                         layer = 'X02_RACE')
+                         layer = 'X02_RACE', quiet = TRUE)
 # Read in geometry layer
 socio_sf_geo <- st_read('data/ACS_2019_5YR_TRACT_48_TEXAS.gdb',
-                    layer = 'ACS_2019_5YR_TRACT_48_TEXAS')
-
-
+                    layer = 'ACS_2019_5YR_TRACT_48_TEXAS', quiet = TRUE)
 ```
 
 ```{r}
-st_layers(dsn = 'data/ACS_2019_5YR_TRACT_48_TEXAS.gdb')
+# Check available layers
+#st_layers(dsn = 'data/ACS_2019_5YR_TRACT_48_TEXAS.gdb')
 ```
 
 # 3. Workflow
@@ -95,6 +97,7 @@ st_layers(dsn = 'data/ACS_2019_5YR_TRACT_48_TEXAS.gdb')
 ## Create Blackout Mask
 
 ```{r}
+#| warning: false
 # Combine night light data by day using st_mosaic
 
 feb_7_comb <- st_mosaic(lights_05_07, lights_06_07)
@@ -129,6 +132,7 @@ blackout_sf <- st_transform(x = blackout_sf, crs = 3083)
 ## Exclude Highways from blackout mask
 
 ```{r}
+#| warning: false
 # Set CRS 
 if (st_crs(roads_sf)$epsg != 3083) {
   warning("CRS is not EPSG:3083 — transforming to EPSG:3083.")
@@ -161,8 +165,8 @@ blackout_dif <- st_difference(x = blackout_sf, y = road_buffer)
 ## Night light intensities before and after the first two storms
 
 ```{r}
-st_crs(feb_7_comb)
-st_crs(feb_16_comb)
+# st_crs(feb_7_comb)
+# st_crs(feb_16_comb)
 
 # Transform the mosaics to geographic CRS
 feb_7_geo <- st_warp(feb_7_comb, crs = 4326)  # WGS84
@@ -197,12 +201,13 @@ compare_plot <- plot(light_change, main = "Change in light from Feb 7th to Feb 1
 
 ```{r}
 tm_shape(blackout_sf, name = "Blackout Areas") +
-  tm_polygons(col = "red", fill_alpha = 0.5, border.col = "darkred") +
+  tm_polygons(col = "red", fill_alpha = 0.5) +
 tm_shape(roads_sf, name = "Streets") +
   tm_lines(col = "grey", lwd = 0.5, col_alpha = 0.5) +
 tm_basemap("OpenStreetMap") +
 tm_layout(legend.outside = TRUE) +
 tm_title("Houston homes that lost power")
+  
 ```
 
 ## Number of homes in Houston that lost power
@@ -218,11 +223,13 @@ if (st_crs(homes_sf)$epsg != 3083) {
 ```
 
 ```{r}
+#| warning: false
 # Total number of homes
 total_homes <- nrow(homes_sf)
 
-# Number of homes in blackout area
-num_blackout <- nrow(blackout_vals)
+# Number of homes in blackout area (spatial join)
+homes_in_blackout <- st_intersection(homes_sf, blackout_sf)
+num_blackout <- nrow(homes_in_blackout)
 
 # Number of homes NOT in blackout area
 num_no_blackout <- total_homes - num_blackout
@@ -241,6 +248,7 @@ cat("Homes not in blackout areas:", num_no_blackout, sprintf("(%.1f%%)", pct_no_
 ## Map of the census tracts in Houston that lost power
 
 ```{r}
+#| warning: false
 # Join income and race data with geometry
 houston_tracts_inc <- socio_sf_geo |> 
   left_join(socio_sf_inc, by = c("GEOID_Data" = "GEOID"))
@@ -272,7 +280,6 @@ houston_tracts_inc$low_income <- houston_tracts_inc$B19013e1 < median_income_thr
 ggplot() +
   # Show all tracts colored by income level
   geom_sf(data = houston_tracts_inc, aes(fill = low_income), color = "white", size = 0.1) +
-  # Overlay blackout areas with red outline
   geom_sf(data = blackout_sf, fill = NA, color = "red", size = 0.5, alpha = 0.7) +
   scale_fill_manual(values = c("FALSE" = "lightblue", "TRUE" = "darkblue"),
                     labels = c("Higher Income", "Lower Income"),
@@ -320,12 +327,10 @@ ggplot(income_data, aes(x = median_income, fill = blackout_status)) +
 tracts_with_blackout <- st_intersects(houston_tracts_race, blackout_sf, sparse = FALSE)
 houston_tracts_race$blackout <- rowSums(tracts_with_blackout) > 0
 
-# B02001e1 is total population
-# B02001e2 is White alone
 # Calculate percent white for comparison
 houston_tracts_race$pct_white <- (houston_tracts_race$B02001e2 / houston_tracts_race$B02001e1) * 100
 
-# Create the plot
+# Plot percent white by blackout status
 race_data <- houston_tracts_race |> 
   st_drop_geometry() |> 
   select(blackout, pct_white) |> 
@@ -344,3 +349,7 @@ ggplot(race_data, aes(x = pct_white, fill = blackout_status)) +
        y = "Number of Census Tracts") +
   theme_minimal()
 ```
+
+## Reflection
+
+The results show inequities in the socioeconomic impacts of power loss. Poorer census tracts with a median household income of \$40,000 to \$80,000 were relatively more affected compared to rich ones. Predominantly white neighborhoods experienced higher rates of power loss, which could simply be a result of Houston's demographics. The limitations of this project could be that the 200-unit threshold for defining blackouts could have missed some variation, especially because I used st_difference instead of st_intersects which was taking to long. In addition, using the spatial overlap to identify tracts likely overestimated impacts. Finally, 2019 Census data may or may not reflect the actual demographics of 2021 when the storms took place.
